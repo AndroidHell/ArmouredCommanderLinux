@@ -11,6 +11,7 @@ I included the files for libtcod until I get yelled at as the engine is in no wa
 The only thing you might need to do to get this running is to install pygame
 
 Ubuntu: "sudo apt-get install python-pygame"
+
 Other distros: yum/pacman/whatever "python-pygame" probably :P
 
 Then make sure armcom.py is executable and run it from terminal or double clicking.
