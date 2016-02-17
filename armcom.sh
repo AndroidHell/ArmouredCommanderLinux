@@ -1,2 +1,2 @@
 #!/bin/sh
-python armcom.py
+python2.7 armcom.py
