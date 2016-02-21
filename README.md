@@ -1,6 +1,6 @@
 # Armoured Commander Linux Fork
 
-## now built based on version 1.0.1
+## now built based on version 1.01
 
 ## Reddit user /u/ArmouredCommander gets full credit as this is their game
 
