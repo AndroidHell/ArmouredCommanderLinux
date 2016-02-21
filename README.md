@@ -1,6 +1,10 @@
 # Armoured Commander Linux Fork
 
+## now built based on version 1.0.1
+
 ## Reddit user /u/ArmouredCommander gets full credit as this is their game
+
+**NOTE:** There are known issues with the game running on Arch and Debian. The Debian issue and possible fix is listed in issues of this repo. I haven't had time to address these yet.
 
 I saw this on reddit and saw that it was done in python and since I am currently workng on the python RL tut, curiousity got hte better of me.
 

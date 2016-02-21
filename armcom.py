@@ -30,8 +30,11 @@
 #
 ##########################################################################################
 
-########## 1.0 Changelog ##########
-# No changes from preview 1
+########## 1.01 Changelog ##########
+# - Fixed a bug where the assistant driver did not have his Fire Bow MG order properly
+#   disabled when an encounter starts with the player tank Hull Down
+# - Hopefully fixed a bug where a marshland area could be assigned as the target for
+#   a 'capture' mission
 
 ##########################################################################################
 
@@ -66,7 +69,7 @@ DEBUG = False						# enable in-game debug commands
 
 NAME = 'Armoured Commander'
 VERSION = '1.0'					# determines saved game compatability
-SUBVERSION = ''					# descriptive only, no effect on compatability
+SUBVERSION = '1'				# descriptive only, no effect on compatability
 
 COMPATIBLE_VERSIONS = ['Beta 3.0']		# list of older versions for which the savegame
 						#  is compatible with this version
@@ -561,12 +564,12 @@ class Campaign:
 		self.mission_activations = []		# list of activation chance dictionaries
 							# for advance, battle, counterattack
 							# missions
-		self.activation_modifiers = []		# NEW: list of activation modifiers
+		self.activation_modifiers = []		# list of activation modifiers
 		self.class_activations = []		# list of unit type and activation chance
 							# tuples for each unit class
 							# first item is always unit class name
-		self.ranks = None			# NEW: list of ranks for current nation
-		self.decorations = None			# NEW: list of decorations "
+		self.ranks = None			# list of ranks for current nation
+		self.decorations = None			# list of decorations "
 		
 		self.days = []				# list of calendar days: each one is
 							#  a dictionary with keys and values
@@ -659,7 +662,6 @@ class Campaign:
 		for node in self.day_map.nodes:
 			if node == campaign.day_map.player_node: continue
 			if not node.friendly_control: continue
-			# NEW: skip blocked nodes
 			if node in self.day_map.blocked_nodes: continue
 			if node.top_edge:
 				nodes.append(node)
@@ -710,7 +712,7 @@ class Campaign:
 				#campaign.MoveViewTo(campaign.day_map.player_node)
 				RenderCampaign()
 		
-		# NEW: if no possible path to 'exit' node, player is moved to nearest
+		# if no possible path to 'exit' node, player is moved to nearest
 		#   friendly node, spends 1-20 HE shells
 		if not campaign.day_map.player_node.exit:
 			for node in campaign.day_map.nodes:
@@ -781,7 +783,7 @@ class Campaign:
 		
 		roll = Roll1D100()
 		
-		# NEW: if no event yet today, set current time as 'time of last event' and return
+		# if no event yet today, set current time as 'time of last event' and return
 		if self.time_of_last_event == (0,0):
 			self.time_of_last_event = (self.hour, self.minute)
 			return
@@ -849,13 +851,16 @@ class Campaign:
 			player_y = campaign.day_map.player_node.y
 			nodes = []
 			for node in campaign.day_map.nodes:
-				if node in campaign.day_map.blocked_nodes: continue	# NEW
+				if node in campaign.day_map.blocked_nodes: continue
+				# NEW: skip marshland nodes; should have been done by
+				#  previous line but still seems to be getting through
+				if node.node_type == 'E': continue
 				if node == campaign.day_map.player_node: continue
 				if node.y > player_y: continue
 				if quest_type != 'DEFEND' and node.friendly_control: continue
 				if quest_type == 'DEFEND' and not node.friendly_control: continue
 				if quest_type == 'RECON' and node.res_known: continue
-				# NEW: node must be close to player
+				# node must be close to player
 				if len(GetPath(campaign.day_map.player_node, node)) > 3: continue
 				nodes.append(node)
 			
@@ -912,7 +917,7 @@ class Campaign:
 		# Exit Area Changed
 		elif roll <= 80:
 			
-			# NEW: don't move if player within 2 nodes of current exit
+			# don't move if player within 2 nodes of current exit
 			for node in campaign.day_map.nodes:
 				if node.exit:
 					if len(GetPath(campaign.day_map.player_node, node)) <= 4:
@@ -1160,7 +1165,7 @@ class Campaign:
 	def AwardCaptureVP(self, node, counterattack=False):
 		if node.node_type in ['A', 'B']:
 			vp = 1
-		elif node.node_type in ['C', 'F']: # NEW: bocage
+		elif node.node_type in ['C', 'F']:
 			vp = 3
 		elif node.node_type == 'D':
 			vp = 2
@@ -1256,7 +1261,6 @@ class Campaign:
 			for node in self.day_map.nodes:
 				if node.quest_time_limit is not None:
 					(h,m) = node.quest_time_limit
-					# NEW: changed from self.minute >= m
 					if self.hour > h or (self.hour == h and self.minute > m):
 						# cancel quest						
 						text = ('Time has run out to complete ' +
@@ -1709,7 +1713,6 @@ class PlayerTank:
 			self.alive = False
 			battle.result = 'Tank Lost'
 			for crewman in tank.crew:
-				# NEW
 				crewman.ResolveKIA()
 		
 		# Knocked Out
@@ -2122,7 +2125,7 @@ class Crewman:
 		UpdateScreen()
 		
 		# decoration description
-		# NEW: get description from definitions file
+		# get description from definitions file
 		if dec_name == 'Purple Heart':
 			text = 'for wounds received in action'
 		else:
@@ -3411,7 +3414,7 @@ class EnemyUnit:
 		self.terrain = terrain
 	
 	# returns a short string of text to describe this unit
-	# NEW: if just spawned, return a simpler description
+	# if just spawned, return a simpler description
 	def GetDesc(self, new_spawn=False):
 		
 		# return a descriptive string for this unit's class, or type if does
@@ -3461,7 +3464,7 @@ class EnemyUnit:
 			# should never get as far as this point, but just in case
 			return ''
 		
-		# NEW: just appeared, return a simple description
+		# just appeared, return a simple description
 		if new_spawn:
 			return GetClassDesc()
 		
@@ -3869,7 +3872,7 @@ class EnemyUnit:
 			self.facing = 'Front'
 			return True
 		
-		# NEW: if LW armed with PF, may do a PF attack
+		# if LW armed with PF, may do a PF attack
 		if self.unit_class == 'LW':
 			if self.PFAttack(): return
 		
@@ -4039,7 +4042,6 @@ class EnemyUnit:
 						if crewman.StunCheck(10):
 							PopUp(crewman.name + ' is Stunned from the impact!')
 				del roll_action
-				# NEW: didn't return anything previously, allowing enemy to act again
 				return True
 		else:
 			roll_action.result = 'Shot misses!'
@@ -4051,7 +4053,6 @@ class EnemyUnit:
 		UpdateTankCon()
 		RenderEncounter()
 		
-		# NEW: main gun miss sound effect
 		if shot_missed:
 			PlaySound('main_gun_miss')
 		
@@ -4330,7 +4331,7 @@ class EnemyUnit:
 		if 'Radio Malfunction' in tank.damage_list or 'Radio Broken' in tank.damage_list:
 			mod_roll += 2
 		
-		# NEW commonwealth forces get a bonus to arty attacks
+		# British and Commonwealth forces get a bonus to arty attacks
 		if artillery and campaign.player_nation in ['CAN', 'UK']:
 			mod_roll -= 2
 		
@@ -4389,7 +4390,7 @@ class EnemyUnit:
 		# place smoke if not already there
 		else:
 			
-			# NEW: movable infantry units less likely to be smoked
+			# movable infantry units less likely to be smoked
 			if self.unit_class in ['LW', 'MG']:
 				mod_roll -= 2
 			
@@ -4450,7 +4451,7 @@ class EnemyUnit:
 	# do an action for this unit
 	def DoAction(self, ambush=False):
 		
-		# NEW: if pinned or stunned, unit can only recover or do nothing this turn
+		# if pinned or stunned, unit can only recover or do nothing this turn
 		if self.pinned:
 			if self.MoraleTest():
 				text = ' recovers from being Pinned.'
@@ -4473,7 +4474,7 @@ class EnemyUnit:
 			ShowLabel(self.x+MAP_CON_X, self.y+MAP_CON_Y, self.GetDesc() + text)
 			return
 		
-		# NEW: build odds table for this unit
+		# build odds table for this unit:
 		# do nothing, move closer, move laterally, move away, attack infantry,
 		#  attack friendly tank (player if shot at), attack player tank, attack lead tank
 		if self.unit_class in ['TANK', 'SPG']:
@@ -4538,7 +4539,7 @@ class EnemyUnit:
 				ranges = [10,40,60,70,95,0,100]
 		
 		###################################################################
-		# NEW: try to roll an action result that is possible for the unit #
+		#   try to roll an action result that is possible for the unit    #
 		###################################################################
 		for i in range(300):
 			
@@ -4664,7 +4665,7 @@ def WriteJournal(text):
 # output the completed campaign journal to a text file
 def RecordJournal():
 	
-	# NEW - add final crew reports
+	# add final crew reports
 	for crewman in tank.crew:
 		lines = crewman.GenerateReport()
 		for line in lines:
@@ -5583,9 +5584,8 @@ def ShowSettings():
 		libtcod.console_print(menu_con, 52, 18, text)
 		
 		text = '[%cF%c]ull Screen: '%HIGHLIGHT
-		# NEW: display based on actual fullscreen status, not campaign setting
+		# display based on actual fullscreen status, not campaign setting
 		if libtcod.console_is_fullscreen():
-		#if campaign.fullscreen:
 			text += 'On'
 		else:
 			text += 'Off'
@@ -5642,7 +5642,7 @@ def ShowSettings():
 				refresh = True
 			
 			elif key_char in ['f', 'F']:
-				# NEW: switch FS mode and update campaign setting if required
+				# switch FS mode and update campaign setting if required
 				libtcod.console_set_fullscreen(not libtcod.console_is_fullscreen())
 				campaign.fullscreen = libtcod.console_is_fullscreen()
 				refresh = True
@@ -5678,7 +5678,7 @@ def ShowSettings():
 # display information on the campaign or encounter map; no input possible while it's
 # being displayed
 # x, y is highlighted object or location; label appears centered under this
-# NEW: if crewman is not none, label is being spoken by that crewman
+# if crewman is not none, label is being spoken by that crewman
 def ShowLabel(x, y, original_text, crewman=None):
 	
 	libtcod.console_set_default_background(0, GREYED_COLOR)
@@ -5686,7 +5686,7 @@ def ShowLabel(x, y, original_text, crewman=None):
 	# build text string
 	text = ''
 	
-	# NEW: add crewman position to front of string
+	# add crewman position to front of string
 	if crewman is not None:
 		text += crewman.position + ': '
 	text += original_text
@@ -5960,7 +5960,7 @@ def SpawnEnemy(unit_class=None, map_hex=None):
 		# make a copy so we can apply date modifiers if any
 		activation_list = list(campaign.mission_activations[column])
 		
-		# NEW: apply date modifier if any
+		# apply date modifier if any
 		if len(campaign.activation_modifiers) > 0:
 			for mod in campaign.activation_modifiers:
 				if CheckModifer(mod):
@@ -5971,7 +5971,7 @@ def SpawnEnemy(unit_class=None, map_hex=None):
 							if v < 0: v = 0
 							break				
 		
-		# NEW: get sum of activation chances, might be modified beyond total of 100
+		# get sum of activation chances, might be modified beyond total of 100
 		total = 0
 		for (k,v) in activation_list:
 			total += v
@@ -6075,7 +6075,7 @@ def SpawnEnemy(unit_class=None, map_hex=None):
 	# determine spawn hex if not specified
 	if map_hex is None:
 	
-		# NEW: roll for spawn sector
+		# roll for spawn sector
 		d1, d2, roll = Roll2D6()
 		if campaign.scen_type == 'Counterattack':
 			roll += 1
@@ -6097,10 +6097,10 @@ def SpawnEnemy(unit_class=None, map_hex=None):
 			result -= 3
 		elif campaign.day_map.player_node.node_type == 'D':
 			result -= 2
-		elif campaign.day_map.player_node.node_type == 'F':	# NEW bocage
+		elif campaign.day_map.player_node.node_type == 'F':
 			result -= 5
 		
-		# NEW apply firefly drm
+		# apply firefly drm
 		if tank.stats['vehicle_type'] == 'Sherman VC':
 			result += 3
 		
@@ -6207,7 +6207,7 @@ def SpawnCrewMember(name, position, rank_level, replacement=False, old_member=No
 	new_crew.position = position
 	new_crew.rank_level = rank_level
 	
-	# choose a random hometown (NEW: includes Canada)
+	# choose a random hometown
 	if campaign.player_nation == 'USA':
 		new_crew.hometown = random.choice(USA_HOMETOWNS)
 	elif campaign.player_nation == 'CAN':
@@ -6883,7 +6883,6 @@ def ShowVehicleTypeInfo(unit_type, console, x, y, no_image=False):
 	if stats.has_key('main_gun'):
 		text = stats['main_gun']
 		if text != 'MG':
-			# NEW formatting
 			text.replace('L', '') + 'mm'
 	else:
 		text = 'None'
@@ -7270,7 +7269,6 @@ def ResolveCrewFate(hit_location, sector, pf, abandoned=False):
 		if crewman.alive:
 			text = crewman.BailOut()
 			
-			# NEW
 			if text == 'Passed':
 				WriteJournal(crewman.name + ' bailed out successfully.')
 			else:
@@ -7529,7 +7527,6 @@ def SetupFireMGs():
 		tank.aa_mg_can_fire = True
 	if GetCrewByPosition('Gunner').order == 'Fire Co-Axial MG':
 		tank.coax_mg_can_fire = True
-	# NEW
 	if not tank.stats.has_key('no_asst_driver'):
 		if GetCrewByPosition('Asst. Driver').order == 'Fire Bow MG' and not tank.hull_down:
 			tank.bow_mg_can_fire = True
@@ -7854,7 +7851,7 @@ def FireMainGun():
 	
 	if battle.target is None: return
 	
-	# NEW: random callout
+	# random callout
 	if Roll1D10() == 1:
 		ShowLabel(MAP_X0+MAP_CON_X, MAP_Y0+MAP_CON_Y, 'Firing!',
 			GetCrewByPosition('Gunner'))
@@ -7886,7 +7883,7 @@ def FireMainGun():
 	roll_action.attacker_unit_type = tank.unit_type
 	roll_action.attacker = tank.stats['vehicle_type'] + ' "' + tank.name + '"'
 	
-	# NEW: record description of main gun and ammo used
+	# record description of main gun and ammo used
 	roll_action.attack_type = tank.stats['main_gun'].replace('L', '') + 'mm ' + tank.ammo_load
 	
 	# mark if target is unspotted or needs to be identified
@@ -7912,7 +7909,7 @@ def FireMainGun():
 	roll_action.d2 = d2
 	roll_action.roll = roll
 	
-	# NEW: flag to record what kind of animation / effect to show later
+	# flag to record what kind of animation / effect to show later
 	hit_result = None
 	
 	# handle smoke attacks differently
@@ -7959,7 +7956,7 @@ def FireMainGun():
 				weak_spot = True
 		
 		# critical hit, automatically hits
-		# NEW: only if original to-hit roll was 2+
+		# if original to-hit roll was 2+
 		if roll_action.roll_req >= 2 and (roll == 2 or weak_spot):
 			roll_action.result = 'Critical Hit!'
 			battle.target.hit_record.append(MainGunHit(tank.stats['main_gun'],
@@ -7982,7 +7979,7 @@ def FireMainGun():
 			roll_action.result = 'Shot missed.'
 			hit_result = 'miss'
 		
-	# clear the fired shell, NEW: record last shell type
+	# clear the fired shell, record last shell type
 	old_load = tank.ammo_load
 	tank.ammo_load = 'None'
 	
@@ -8088,7 +8085,7 @@ def FireMainGun():
 	# reset turret facing since can't rotate again
 	tank.old_t_facing = tank.turret_facing
 	
-	# NEW: show shot result animation and/or sound
+	# show shot result animation and/or sound
 	RenderEncounter()
 	if hit_result is not None:
 		HitAnimation(hit_result)
@@ -8099,7 +8096,7 @@ def FireMainGun():
 	# delete the roll action object
 	del roll_action
 	
-	# NEW: call out new ammo load if any
+	# call out new ammo load if any
 	if tank.ammo_load != 'None' and old_load != tank.ammo_load:
 		ShowLabel(MAP_X0+MAP_CON_X, MAP_Y0+MAP_CON_Y,
 			tank.ammo_load + ' up!', GetCrewByPosition('Loader'))
@@ -8609,10 +8606,8 @@ def MoveTank():
 		
 		# skill check
 		if crew_member.SkillCheck('Eye for Cover'):
-			# NEW: -2 bonus
 			mod_roll -= 2
 		
-		# NEW terrain modifier
 		if campaign.day_map.player_node.node_type == 'F':
 			mod_roll -= 2
 		
@@ -8630,7 +8625,6 @@ def MoveTank():
 		if crew_member.SkillCheck('Eye for Cover'):
 			mod_roll -= 1
 		
-		# NEW terrain modifier
 		if campaign.day_map.player_node.node_type == 'F':
 			mod_roll -= 2
 		
@@ -9733,7 +9727,7 @@ def GetChoice(prompt_text, choice_list):
 # handle random encounter event
 def RandomEvent():
 	
-	# NEW: chance of no event this round
+	# chance of no event this round
 	if Roll1D6() <= 2:
 		Message('No Random Event this round.')
 		return
@@ -9973,7 +9967,7 @@ def LoadCampaignInfo():
 	campaign.player_nation = root.find('player_nation').text
 	campaign.enemy_nation = root.find('enemy_nation').text
 	
-	# NEW - set campaign variables for ranks and awards based on player nation
+	# set campaign variables for ranks and awards based on player nation
 	if campaign.player_nation == 'USA':
 		campaign.ranks = USA_RANKS
 		campaign.decorations = USA_DECORATIONS
@@ -9981,7 +9975,7 @@ def LoadCampaignInfo():
 		campaign.ranks = UKC_RANKS
 		campaign.decorations = UKC_DECORATIONS
 	
-	# NEW - load campaign map file info from campaign file
+	# load campaign map file info from campaign file
 	if root.find('campaign_map_file') is not None:
 		campaign.map_file = root.find('campaign_map_file').text
 	
@@ -10003,7 +9997,7 @@ def LoadCampaignInfo():
 			tuple_list.append((class_name, value))
 		campaign.mission_activations.append(tuple_list)
 	
-	# NEW: load activation modifiers as list of dictionaries
+	# load activation modifiers as list of dictionaries
 	item = root.find('activation_modifiers')
 	if item is not None:
 		for child in item.findall('modifier'):
@@ -10028,7 +10022,6 @@ def LoadCampaignInfo():
 		campaign.class_activations.append(unit_list)
 	
 	# load calendar day info into campaign object
-	# NEW: changed to full XML
 	REQUIRED_KEYS = ['month', 'date', 'year', 'comment']
 	OPTIONAL_KEYS = ['resistance_level', 'mission', 'description', 'terrain',
 		'map_x', 'map_y']
@@ -10145,7 +10138,6 @@ def CrewTalk(message, position_list=None):
 		x = MAP_X0 + MAP_CON_X
 		y = MAP_Y0 + MAP_CON_Y
 	
-	# NEW: use on-screen label instead
 	ShowLabel(x, y, message, crewman=crewman)
 	
 	# re-draw original console to screen
@@ -11079,14 +11071,14 @@ def InitEncounter(load=False, counterattack=False, res_level=None):
 		# set up battle object
 		battle = Battle(counterattack=counterattack, res_level=res_level)
 		
+		# roll on deployment table for player tank status
+		# NEW: moved up here
+		tank.SetDeployment()
+		
 		# set up initial list of orders for crew, also set their initial spot ability
 		for crewman in tank.crew:
 			crewman.BuildOrdersList()
 			crewman.SetSpotAbility()
-		
-		# roll on deployment table for player tank status
-		# NEW: moved up here
-		tank.SetDeployment()
 		
 		# draw encounter consoles for first time
 		PaintMapCon()
@@ -11588,7 +11580,7 @@ def PaintCampaignMap():
 			DrawRoad(line)
 			node.extended = True
 	
-	# NEW: bocage painting method
+	# bocage painting method
 	for node in campaign.day_map.nodes:
 		if node.node_type == 'F':
 			
@@ -11636,11 +11628,11 @@ def UpdateCOverlay(highlight_node=None, anim_x=-1, anim_y=-1):
 	libtcod.console_clear(c_overlay_con)
 	libtcod.console_set_default_background(c_overlay_con, libtcod.black)
 	
-	# NEW: highlight frontline between friendly and hostile map areas
+	# highlight frontline between friendly and hostile map areas
 	libtcod.console_set_default_foreground(c_overlay_con, FRONTLINE_COLOR)
 	for node in campaign.day_map.nodes:
 		if not node.friendly_control: continue
-		# NEW: skip impassible nodes too
+		# skip impassible nodes too
 		if node in campaign.day_map.blocked_nodes: continue
 		for (x,y) in node.edges:
 			# check adjacent map character locations
@@ -11958,7 +11950,7 @@ def SelectNextArea():
 		campaign.selected_node = nodes[0]
 		return
 	
-	# NEW: sort by degree heading to player node
+	# sort by degree heading to player node
 	def GetHeading(node):
 		rads = atan2(node.y-campaign.day_map.player_node.y, node.x-campaign.day_map.player_node.x)
 		rads %= 2*pi
@@ -12452,7 +12444,6 @@ def PostEncounter(no_combat=False):
 	campaign.BuildActionList()
 	UpdateCActionCon()
 	
-	# NEW structure
 	# if sunset hasn't hit, check for some game events
 	if not campaign.sunset:
 	
@@ -12475,7 +12466,7 @@ def PostEncounter(no_combat=False):
 				good_map = GenerateCampaignMap()
 			PaintCampaignMap()
 			
-			# NEW: move player view to starting node of new map
+			# move player view to starting node of new map
 			campaign.MoveViewTo(campaign.day_map.player_node)
 			
 			# set initial input mode to check adjacent area, no time cost
@@ -13247,7 +13238,7 @@ def GenerateCampaignMap():
 	# create a new instance of the day map class
 	campaign.day_map = CampaignDayMap()
 	
-	# NEW: clear the currently selected node if any
+	# clear the currently selected node if any
 	campaign.selected_node = None
 	
 	# generate the map nodes
@@ -13318,18 +13309,7 @@ def GenerateCampaignMap():
 			CheckCoord(x, 0, y, -1, parent_node)
 			CheckCoord(x, 0, y, 1, parent_node)
 	
-	# make sure there's a clear line between node centres for them to be adjacent
-	# Removed for Beta 3.07
-	#for node in campaign.day_map.nodes:
-	#	for node2 in reversed(node.links):
-	#		line = GetLine(node.x, node.y, node2.x, node2.y)
-	#		for (x,y) in line:
-	#			test_node = campaign.day_map.char_locations[(x, y)]
-	#			if test_node != node and test_node != node2:
-	#				node.links.remove(node2)
-	#				break
-	
-	# NEW: set node terrain chances based on day terrain type if any
+	# set node terrain chances based on day terrain type if any
 	today = GetToday()
 	if today.has_key('terrain'):
 		if today['terrain'] == 'bocage':
@@ -13414,7 +13394,7 @@ def GenerateCampaignMap():
 		start_node = node
 		break
 	
-	# NEW: counterattack missions also have an 'exit' node
+	# counterattack missions also have an 'exit' node
 	for node in random.sample(campaign.day_map.nodes, len(campaign.day_map.nodes)):
 		if campaign.scen_type == 'Counterattack':
 			if not node.bottom_edge: continue
@@ -13504,7 +13484,7 @@ def GenerateCampaignMap():
 def CheckAwardsPromotions(new_month=False):
 	
 	# check for purple heart awards for USA players
-	# NEW: no award for light wound
+	# (no award for light wound)
 	if campaign.player_nation == 'USA':
 		for crewman in tank.crew:
 			if crewman.serious_wound or crewman.v_serious_wound or not crewman.alive:
@@ -13707,7 +13687,6 @@ def CheckPlayerTank():
 		
 		WriteJournal('New player tank: ' + tank.unit_type + ' "' + tank.name + '"')
 		
-		# NEW - moved this check here since it wasn't working otherwise
 		# check for asst driver changeup
 		CheckPlayerTankPositions()
 		
@@ -13829,7 +13808,7 @@ def AdvanceDay():
 		text += ': ' + today['comment']
 	WriteJournal(text)
 	
-	# fade-in day comment, NEW: required field
+	# fade-in day comment
 	text = today['comment']
 	for c in range(0, 255, 5):
 		libtcod.console_set_default_foreground(0, libtcod.Color(c,c,c))
@@ -13916,7 +13895,7 @@ def RunCalendar(load_day):
 	else:
 		SaveGame()
 	
-	# NEW: load campaign map if any into a console
+	# load campaign map if any into a console
 	campaign_map = None
 	if campaign.map_file != '':
 		campaign_map = LoadXP(campaign.map_file)
@@ -13986,7 +13965,7 @@ def RunCalendar(load_day):
 		# finally, display current campaign VP score
 		libtcod.console_print(con, 30, 45, 'Current VP Score: ' + str(campaign.vp))
 		
-		# NEW: display campaign map if any
+		# display campaign map if any
 		if campaign_map is not None:
 			libtcod.console_blit(campaign_map, 0, 0, 0, 0, con, 63, 2)
 			
@@ -14184,7 +14163,6 @@ def SetCampaignSettings():
 		else:
 			libtcod.console_print(menu_con, x, 23, 'If your tank commander is killed or sent home due to injuries, your campaign is over.')
 		
-		# NEW - start the campaign at any point in the calendar
 		text = 'Campaign Start Date: '
 		day = campaign.days[campaign.start_date]
 		year = int(day['year'])
@@ -14390,7 +14368,7 @@ def NewCampaign():
 	WriteJournal(text)
 	WriteJournal('')
 	
-	# NEW: set starting date now
+	# set starting date now
 	AdvanceDay()
 	
 	# if tank selection is unlimited, allow player to select tank model
@@ -14432,7 +14410,7 @@ def NewCampaign():
 	PopUp(crewman.name + ' is assigned as your Driver.')
 	ShowSkills(crewman)
 	
-	# NEW - some tank models have no assistant driver
+	# some tank models have no assistant driver
 	if not tank.stats.has_key('no_asst_driver'):
 		crewman = SpawnCrewMember(None, 'Asst. Driver', 0)
 		PopUp(crewman.name + ' is assigned as your Assistant Driver.')
@@ -14815,7 +14793,7 @@ def LoadImage(image_name):
 	return libtcod.image_load(pathname)
 
 
-# NEW: return the proper sound file to use for the given main gun type
+# return the proper sound file to use for the given main gun type
 def GetFiringSound(gun_type):
 	if gun_type in ['20L', '50L']:
 		return '20_mm_gun'
@@ -15128,7 +15106,7 @@ def MainMenu():
 			save.close()
 			
 			# check saved game version against current
-			# NEW: also checks against a list of compatible previous versions
+			# also checks against a list of compatible previous versions
 			if game_info.game_version != VERSION and game_info.game_version not in COMPATIBLE_VERSIONS:
 				libtcod.console_set_default_foreground(con, libtcod.light_red)
 				text = 'Saved game does not match current game version'
